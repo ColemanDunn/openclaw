@@ -15,39 +15,6 @@ function collectVisibleText(output: OpenAICompletionsOutput): string {
 }
 
 describe("openai completions stream", () => {
-  it.each(["default", "priority", undefined, null, "untrusted-value"])(
-    "retains only explicit standard or priority service-tier facts: %s",
-    async (serviceTier) => {
-      const model = makeCompletionsModel();
-      const output = createAssistantOutput(model);
-      await processCompletionsStream(
-        streamChunks([
-          makeCompletionsChunk({ content: "ok" }, null, { service_tier: serviceTier }),
-          makeCompletionsChunk({}, null, {
-            service_tier: serviceTier === "default" ? "priority" : serviceTier,
-          }),
-          makeCompletionsChunk({}, "stop", { service_tier: serviceTier }),
-        ]),
-        output,
-        model,
-        { push() {} },
-      );
-      expect(collectVisibleText(output)).toBe("ok");
-      expect(output.stopReason).toBe("stop");
-      expect(output.diagnostics ?? []).toEqual(
-        serviceTier === "default" || serviceTier === "priority"
-          ? [
-              {
-                type: "provider_service_tier",
-                timestamp: expect.any(Number),
-                details: { serviceTier },
-              },
-            ]
-          : [],
-      );
-    },
-  );
-
   it("partitions inline reasoning tags out of OpenAI-compatible visible text", async () => {
     const model = makeCompletionsModel({
       id: "MiniMax-M2.7",

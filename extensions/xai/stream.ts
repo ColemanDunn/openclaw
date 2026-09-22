@@ -8,16 +8,15 @@ import {
   createToolStreamWrapper,
 } from "openclaw/plugin-sdk/provider-stream-shared";
 import { asOptionalRecord, filterStringEntries } from "openclaw/plugin-sdk/string-coerce-runtime";
-import { isXaiGrokProxyBaseUrl } from "./base-url.js";
 import { resolveXaiFastModelId, supportsXaiPriorityProcessing } from "./fast-mode.js";
 import { XAI_BASE_URL } from "./model-definitions.js";
-import { streamXaiPriority } from "./priority-stream.js";
-import { isXaiProviderId } from "./provider-id.js";
+import { isXaiGrokProxyBaseUrl } from "./provider-catalog.js";
+import { isXaiBaseUrl, isXaiProviderId } from "./provider-id.js";
 
 type DynamicFastMode = boolean | (() => boolean | undefined);
 
 function isXaiEndpoint(model: Parameters<StreamFn>[0], endpoint: string): boolean {
-  return isXaiProviderId(model.provider) && model.baseUrl?.trim().replace(/\/+$/u, "") === endpoint;
+  return isXaiProviderId(model.provider) && isXaiBaseUrl(model.baseUrl, endpoint);
 }
 
 function createXaiGrokOAuthHeadersWrapper(
@@ -218,17 +217,24 @@ function createXaiFastModeWrapper(
   fastMode: DynamicFastMode,
 ): StreamFn {
   const underlying = baseStreamFn ?? streamSimple;
+  const priorityStream = createPayloadPatchStreamWrapper(underlying, ({ payload }) => {
+    if (payload.service_tier === undefined) {
+      payload.service_tier = "priority";
+    }
+  });
   return (model, context, options) => {
-    if ((typeof fastMode === "function" ? fastMode() : fastMode) !== true) {
+    const fastModeEnabled = typeof fastMode === "function" ? fastMode() : fastMode;
+    if (fastModeEnabled !== true) {
       return underlying(model, context, options);
     }
     const fastModelId = resolveXaiFastModelId(model);
     if (fastModelId) {
       return underlying({ ...model, id: fastModelId }, context, options);
     }
-    return supportsXaiPriorityProcessing(model)
-      ? streamXaiPriority(underlying, model, context, options)
-      : underlying(model, context, options);
+    if (supportsXaiPriorityProcessing(model)) {
+      return priorityStream(model, context, options);
+    }
+    return underlying(model, context, options);
   };
 }
 

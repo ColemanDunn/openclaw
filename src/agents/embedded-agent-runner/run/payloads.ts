@@ -65,7 +65,6 @@ import { buildFailureWarning } from "./tool-error-warning.js";
 export function buildEmbeddedRunPayloads(params: {
   assistantTexts: string[];
   answerSegments?: EmbeddedAgentSubscribeState["answerSegments"];
-  providerNotices?: string[];
   assistantMessageIndex?: number;
   assistantTranscriptOwned?: boolean;
   assistantTranscriptIdempotencyKey?: string;
@@ -140,7 +139,6 @@ export function buildEmbeddedRunPayloads(params: {
   let hasUserFacingReply =
     completedSourceReplyViaMessageTool || params.heartbeatToolResponse?.notify === true;
   let hasIntentionalSilentFinal = false;
-  let currentAnswerFailed = false;
   const appendSegmentAnswer = ({
     assistantTexts,
     lastAssistant,
@@ -166,7 +164,6 @@ export function buildEmbeddedRunPayloads(params: {
     const lastAssistantAborted = lastAssistantStopReason === "aborted";
     const runAborted = params.runAborted === true || lastAssistantAborted;
     const lastAssistantNeedsErrorSurface = lastAssistantErrored || lastAssistantAborted;
-    currentAnswerFailed = runAborted || lastAssistantNeedsErrorSurface;
     const rawErrorMessage = lastAssistantNeedsErrorSurface
       ? normalizeOptionalString(assistantForPayload?.errorMessage)
       : undefined;
@@ -400,7 +397,7 @@ export function buildEmbeddedRunPayloads(params: {
     replyItems.push({ text: HEARTBEAT_TOKEN });
   }
   const hasAudioAsVoiceTag = replyItems.some((item) => item.audioAsVoice);
-  const payloads = replyItems
+  return replyItems
     .map((item) => {
       const assistantMessageIndex =
         getReplyPayloadMetadata(item)?.assistantMessageIndex ?? params.assistantMessageIndex;
@@ -523,22 +520,4 @@ export function buildEmbeddedRunPayloads(params: {
       }
       return true;
     });
-  if (
-    !suppressAssistantArtifacts &&
-    !currentAnswerFailed &&
-    !hasIntentionalSilentFinal &&
-    !params.isCronTrigger &&
-    !params.isHeartbeatTrigger &&
-    payloads.some(
-      (payload) =>
-        !payload.isError &&
-        !payload.isReasoning &&
-        !getReplyPayloadMetadata(payload)?.precedingInputAnswer,
-    )
-  ) {
-    for (const text of new Set(params.providerNotices ?? [])) {
-      payloads.push({ text, isStatusNotice: true });
-    }
-  }
-  return payloads;
 }

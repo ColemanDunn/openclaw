@@ -23,7 +23,6 @@ function createResultFixture(params?: {
   messagesSnapshot?: EmbeddedRunAttemptResult["messagesSnapshot"];
   successfulNestedToolNames?: string[];
   latestMcpAppChannelView?: { viewId: string };
-  providerNotices?: string[];
   clientToolCallSlots?: Array<{
     toolCallId: string;
     name: string;
@@ -102,7 +101,6 @@ function createResultFixture(params?: {
     getSourceReplyDelivered: () => undefined,
     getSourceReplyDeliveryState: () => undefined,
     getPendingToolMediaReply: () => params?.pendingToolMediaReply,
-    getProviderNotices: () => params?.providerNotices ?? [],
     getToolAutoDeliveryMediaUrls: () => params?.toolAutoDeliveryMediaUrls ?? [],
     getReplayState: () => ({ replayInvalid: false, hadPotentialSideEffects: false }),
     getSuccessfulCronAdds: () => 0,
@@ -646,23 +644,6 @@ describe("attempt result projection", () => {
       getReplyPayloadMetadata(expectDefined(payloads[0], "expected the fresh-run payload"))
         ?.heartbeatScratchProposal,
     ).toBeUndefined();
-  });
-
-  it("retains one current-turn provider notice when a retry replaces the attempt result", () => {
-    const notice = "Priority was unavailable; this reply used standard processing.";
-    const carryover = createAttemptCarryover();
-    const first = completeResult({ providerNotices: [notice] });
-    const retry = completeResult();
-    const repeated = completeResult({ providerNotices: [notice] });
-
-    expect(first.providerNotices).toEqual([notice]);
-    carryover.apply(first);
-    carryover.apply(retry);
-    carryover.apply(repeated);
-
-    expect(retry.providerNotices).toEqual([notice]);
-    expect(repeated.providerNotices).toEqual([notice]);
-    expect(completeResult().providerNotices ?? []).toEqual([]);
   });
 
   it("keeps completed client tool calls in reserved source order", () => {

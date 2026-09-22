@@ -12,12 +12,18 @@ export function resolveFastModeSupport(ctx: ProviderFastModePolicyContext): bool
   if (!ctx.api || ctx.runtimeId !== "openclaw") {
     return undefined;
   }
-  if (
-    resolveXaiFastModelId({ id: ctx.modelId, provider: ctx.provider, api: ctx.api }) !== undefined
-  ) {
+  const fastModelId = resolveXaiFastModelId({
+    id: ctx.modelId,
+    provider: ctx.provider,
+    api: ctx.api,
+  });
+  if (fastModelId) {
     return true;
   }
-  return ctx.baseUrl ? supportsXaiPriorityProcessing(ctx) : undefined;
+  if (!ctx.baseUrl) {
+    return undefined;
+  }
+  return supportsXaiPriorityProcessing(ctx);
 }
 
 export function resolveThinkingProfile(

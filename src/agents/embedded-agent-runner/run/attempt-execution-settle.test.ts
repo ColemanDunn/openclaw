@@ -80,7 +80,6 @@ function createFixture() {
     getSourceReplyDelivered: vi.fn(() => undefined),
     getSourceReplyDeliveryState: vi.fn(() => undefined),
     getPendingToolMediaReply: vi.fn(() => undefined),
-    getProviderNotices: vi.fn(() => []),
     getToolAutoDeliveryMediaUrls: vi.fn(() => []),
     getReplayState: vi.fn(() => ({ replayInvalid: false, hadPotentialSideEffects: false })),
     getSuccessfulCronAdds: vi.fn(() => []),

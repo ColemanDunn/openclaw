@@ -41,28 +41,6 @@ describe("private selected Fast metadata", () => {
         baseUrl: "https://api.openai.com/v1",
       },
       { id: "grok-3", name: "Grok 3", provider: "xai", api: "openai-responses" },
-      {
-        id: "grok-4.6",
-        name: "Grok 4.6",
-        provider: "xai",
-        api: "openai-responses",
-        baseUrl: "https://api.x.ai/v1",
-      },
-      {
-        id: "grok-future",
-        name: "Future Grok",
-        provider: "xai",
-        api: "openai-responses",
-        baseUrl: "https://cli-chat-proxy.grok.com/v1",
-      },
-      {
-        id: "grok-proxy",
-        name: "Custom Grok proxy",
-        provider: "xai",
-        api: "openai-responses",
-        baseUrl: "https://proxy.example/v1",
-      },
-      { id: "grok-unresolved", name: "Unresolved Grok", provider: "xai", api: "openai-responses" },
       { id: "MiniMax-M2.7", name: "MiniMax M2.7", provider: "minimax", api: "anthropic-messages" },
     ];
     const resolve = createModelFastModeResolver({
@@ -88,16 +66,8 @@ describe("private selected Fast metadata", () => {
       false,
       true,
       true,
-      true,
-      false,
-      undefined,
-      true,
     ]);
     expect(catalog.map((entry) => resolve(entry, evaluation, "codex"))).toEqual([
-      undefined,
-      undefined,
-      undefined,
-      undefined,
       undefined,
       undefined,
       undefined,

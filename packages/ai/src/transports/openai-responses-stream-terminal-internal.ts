@@ -35,7 +35,6 @@ import type { ResponsesOutputTracker } from "./openai-responses-stream-slots-int
 import {
   IncompleteToolCallError,
   parseTerminalToolCallArguments,
-  recordProviderServiceTier,
 } from "./transport-stream-shared.js";
 
 export type ResponsesEventSink = { push(event: AssistantMessageEvent): void };
@@ -315,7 +314,6 @@ export function createResponsesTerminalController(params: {
     output.responseModel = options?.resolveResponseModel
       ? options.resolveResponseModel()?.trim() || undefined
       : response.model?.trim() || undefined;
-    recordProviderServiceTier(output, response.service_tier);
     const usage = mapResponsesTerminalUsage(response.usage);
     const reasoningTokens = readResponsesReasoningTokens(response.usage);
     if (usage) {

@@ -1,6 +1,5 @@
-import { isXaiGrokProxyBaseUrl } from "./base-url.js";
 import { XAI_BASE_URL } from "./model-definitions.js";
-import { isXaiProviderId } from "./provider-id.js";
+import { isXaiBaseUrl, isXaiProviderId, XAI_GROK_OAUTH_BASE_URL } from "./provider-id.js";
 
 const XAI_FAST_MODEL_IDS = new Map<string, string>([
   ["grok-3", "grok-3-fast"],
@@ -28,7 +27,7 @@ export function supportsXaiPriorityProcessing(model: {
   return (
     isXaiProviderId(model.provider) &&
     (model.api === "openai-completions" || model.api === "openai-responses") &&
-    (model.baseUrl?.trim().replace(/\/+$/u, "") === XAI_BASE_URL ||
-      isXaiGrokProxyBaseUrl(model.baseUrl))
+    (isXaiBaseUrl(model.baseUrl, XAI_BASE_URL) ||
+      isXaiBaseUrl(model.baseUrl, XAI_GROK_OAUTH_BASE_URL))
   );
 }

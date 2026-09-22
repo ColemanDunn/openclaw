@@ -195,7 +195,6 @@ export function prepareEmbeddedRunTerminal(input: {
   const payloads = buildEmbeddedRunPayloads({
     assistantTexts: attempt.assistantTexts,
     answerSegments: attempt.answerSegments,
-    providerNotices: attempt.providerNotices,
     assistantMessageIndex: attempt.lastAssistantTextMessageIndex,
     assistantTranscriptOwned: attempt.assistantTranscriptOwned,
     assistantTranscriptIdempotencyKey: attempt.assistantTranscriptIdempotencyKey,

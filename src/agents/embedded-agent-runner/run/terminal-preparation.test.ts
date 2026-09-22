@@ -325,7 +325,6 @@ describe("prepareEmbeddedRunTerminal", () => {
           currentAttemptAssistant: currentAssistant,
           currentAttemptCompletedAssistant: completedAssistant,
           runtimeModelSelection: nativeSelection,
-          providerNotices: ["Priority was unavailable; this reply used standard processing."],
         }),
         currentAttemptCompletedAssistant: completedAssistant,
         provider: "openai",
@@ -353,7 +352,6 @@ describe("prepareEmbeddedRunTerminal", () => {
         expect.objectContaining({
           lastAssistant: completedAssistant,
           currentAssistant: completedAssistant ?? null,
-          providerNotices: ["Priority was unavailable; this reply used standard processing."],
         }),
       );
       if (completed) {
