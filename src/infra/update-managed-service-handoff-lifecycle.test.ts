@@ -16,13 +16,13 @@ import { expectDefined } from "@openclaw/normalization-core";
 import { describe, expect, it, vi } from "vitest";
 import { SUPERVISOR_HINT_ENV_VARS } from "./supervisor-markers.js";
 import { CONTROL_PLANE_UPDATE_SENTINEL_META_ENV } from "./update-control-plane-sentinel.js";
-import { pathExists } from "./update-managed-service-handoff-boundary.test-support.js";
 import { registerManagedCampaignFailureTests } from "./update-managed-service-handoff-campaign.test-support.js";
 import {
   cleanupStaleManagedServiceUpdateHandoffs,
   MANAGED_SERVICE_UPDATE_HANDOFF_TEMP_PREFIX,
 } from "./update-managed-service-handoff-cleanup.js";
 import { registerManagedHandoffOwnerTests } from "./update-managed-service-handoff-lifecycle.test-support.js";
+import { pathExists } from "./update-managed-service-native.test-support.js";
 import { recordUpdateRunStep } from "./update-run-ledger.js";
 
 const MOCK_INSTALL_ROOT = path.join(os.tmpdir(), `openclaw-handoff-lifecycle-${process.pid}`);

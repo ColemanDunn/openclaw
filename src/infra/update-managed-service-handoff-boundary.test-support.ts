@@ -27,7 +27,6 @@ import {
 import {
   createManagedServiceBoundaryCleanup,
   createManagedServiceBoundaryParent,
-  pathExists,
 } from "./update-managed-service-handoff-process.test-support.js";
 import {
   prepareManagedServiceBoundaryFiles,
@@ -41,11 +40,10 @@ import {
 } from "./update-managed-service-handoff-state.test-support.js";
 import {
   createManagedServiceActivationScript,
+  pathExists,
   readSavedFailure,
 } from "./update-managed-service-native.test-support.js";
 import { createUpdateRun, getUpdateRun } from "./update-run-ledger.js";
-
-export { pathExists };
 
 export function createManagedServiceManagerBoundary({
   spawnMock,
