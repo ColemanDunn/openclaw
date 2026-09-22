@@ -443,10 +443,8 @@ suite.define(() => {
         const checkStatus = page.getByRole("button", { name: "Check status", exact: true });
         await checkStatus.waitFor();
         await expect.poll(() => checkStatus.isDisabled()).toBe(false);
-        const discoveryRequests = async () =>
-          (await gateway.getRequests("update.status")).filter(
-            (request) => request.params?.refreshCheckout === true,
-          );
+        const discoveryRequests = () =>
+          gateway.getRequests("update.status", { refreshCheckout: true });
         const statusRequestsBeforeCheck = (await discoveryRequests()).length;
 
         await gateway.deferNext("update.status");
