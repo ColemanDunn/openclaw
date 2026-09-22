@@ -21,7 +21,7 @@ import {
   readUserGitHubConnection,
   updateUserGitHubConnection,
 } from "../state/user-github-connections.js";
-import { linkEmail } from "../state/user-profiles.js";
+import { linkCanonicalUserProfileEmail } from "../state/user-profile-writes.js";
 import {
   readPersonalGitHubPublication,
   requirePersonalGitHubPublicationConfirmation,
@@ -579,7 +579,7 @@ describe("personal publication authority and recovery", () => {
             );
           }
           if (race === "merge") {
-            linkEmail("alice@example.test", otherOwner);
+            await linkCanonicalUserProfileEmail("alice@example.test", otherOwner);
           }
           if (race === "session") {
             const original = mocks.loadSession.getMockImplementation()!;

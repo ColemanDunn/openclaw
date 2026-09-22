@@ -7,10 +7,16 @@ import {
 } from "./github-publication.test-support.js";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { getPluginRegistryState } from "../plugins/runtime-state.js";
+import { createDeferredCore } from "../shared/deferred.js";
+import * as stateWorker from "../state/openclaw-state-worker-store.js";
 import * as userProfileList from "../state/user-profile-list.js";
+import {
+  ensureCanonicalUserProfileForEmail,
+  linkCanonicalUserProfileEmail,
+  setCanonicalUserProfileRole,
+} from "../state/user-profile-writes.js";
 import * as userProfiles from "../state/user-profiles.js";
 import {
-  ensureProfileForEmail,
   getUserProfileListItem,
   linkEmail,
   setDisplayName,
@@ -50,8 +56,10 @@ describe("shared GitHub publication requester alias bindings", () => {
       const f = await createRequesterPolicyFixture();
       const email = "publication-guest@example.test";
       const later = "publication-later-alias@example.test";
-      const other = ensureProfileForEmail("publication-alias-recipient@example.test");
-      linkEmail("publication-secondary@example.test", f.guestProfile);
+      const other = await ensureCanonicalUserProfileForEmail(
+        "publication-alias-recipient@example.test",
+      );
+      await linkCanonicalUserProfileEmail("publication-secondary@example.test", f.guestProfile);
       const visitors = await prepareVisitorPublicationFixture(f);
       try {
         await visitors.start();
@@ -97,8 +105,8 @@ describe("shared GitHub publication requester alias bindings", () => {
           assignedRole: null,
         });
         setDisplayName(f.guestProfile, "Current name");
-        linkEmail(later, f.guestProfile);
-        setUserProfileRole(f.guestProfile, "maintainer");
+        await linkCanonicalUserProfileEmail(later, f.guestProfile);
+        await setCanonicalUserProfileRole(f.guestProfile, "maintainer");
         invalidateOperatorRolePolicy(f.guestProfile);
         assertWithoutProfileSql();
         expect(observed.mock.lastCall?.[0].profile).toEqual({
@@ -106,7 +114,7 @@ describe("shared GitHub publication requester alias bindings", () => {
           emails: [email, "publication-secondary@example.test", later].toSorted(),
           assignedRole: "maintainer",
         });
-        linkEmail(later, other.id);
+        await linkCanonicalUserProfileEmail(later, other.id);
         assertWithoutProfileSql();
         observed.mockImplementationOnce((context) => {
           const authority = resume(context);
@@ -135,8 +143,13 @@ describe("shared GitHub publication requester alias bindings", () => {
     async ({ backend, change }) => {
       const f = await fixture(backend);
       const email = "publication-guest@example.test";
-      linkEmail("publication-guest-secondary@example.test", f.guestProfile);
-      const other = ensureProfileForEmail("publication-alias-recipient@example.test");
+      await linkCanonicalUserProfileEmail(
+        "publication-guest-secondary@example.test",
+        f.guestProfile,
+      );
+      const other = await ensureCanonicalUserProfileForEmail(
+        "publication-alias-recipient@example.test",
+      );
       const visitors = await prepareVisitorPublicationFixture(f);
       try {
         await visitors.start();
@@ -164,18 +177,18 @@ describe("shared GitHub publication requester alias bindings", () => {
         expect(original.requester.snapshot.grant?.aliasBindingIds).toHaveLength(2);
         expect(JSON.stringify(f.readRequester(queued.requestId))).not.toContain(email);
         if (change === "captured alias") {
-          linkEmail(email, other.id);
+          await linkCanonicalUserProfileEmail(email, other.id);
           expect(original.requester.assertCurrent).toThrow(
             GitHubPublicationRequesterUnavailableError,
           );
-          linkEmail(email, f.guestProfile);
+          await linkCanonicalUserProfileEmail(email, f.guestProfile);
           expect(original.requester.assertCurrent).toThrow(
             GitHubPublicationRequesterUnavailableError,
           );
         } else {
           setDisplayName(f.guestProfile, "Updated publication guest");
           const later = "publication-later-alias@example.test";
-          linkEmail(later, f.guestProfile);
+          await linkCanonicalUserProfileEmail(later, f.guestProfile);
           const retry = await createGitHubPublicationRequesterFixture({
             profileId: f.guestProfile,
             scopes: guestScopes,
@@ -188,7 +201,7 @@ describe("shared GitHub publication requester alias bindings", () => {
           ).toBe(queued.requestId);
           expect(f.readRequester(queued.requestId)).toEqual(original.requester.snapshot);
           retry.release();
-          linkEmail(later, other.id);
+          await linkCanonicalUserProfileEmail(later, other.id);
           expect(original.requester.assertCurrent).not.toThrow();
         }
         expect(getUserProfileListItem(f.guestProfile)).toMatchObject({
@@ -235,7 +248,9 @@ describe("shared GitHub publication requester alias bindings", () => {
       const f = await fixture(backend);
       const email = "publication-guest@example.test";
       const later = "publication-later-alias@example.test";
-      const other = ensureProfileForEmail("publication-alias-recipient@example.test");
+      const other = await ensureCanonicalUserProfileForEmail(
+        "publication-alias-recipient@example.test",
+      );
       const visitors = await prepareVisitorPublicationFixture(f);
       try {
         await visitors.start();
@@ -274,7 +289,7 @@ describe("shared GitHub publication requester alias bindings", () => {
         }
         expect(original.requester.snapshot.grant?.aliasBindingIds).toHaveLength(1);
 
-        linkEmail(later, f.guestProfile);
+        await linkCanonicalUserProfileEmail(later, f.guestProfile);
         const controller = new AbortController();
         const retry = await captureGitHubPublicationRequester(
           {
@@ -299,7 +314,7 @@ describe("shared GitHub publication requester alias bindings", () => {
           // The first preparation admits the retry; the next belongs to its execution.
           if (preparations === 2) {
             if (change === "later alias removed") {
-              linkEmail(later, other.id);
+              await linkCanonicalUserProfileEmail(later, other.id);
             } else {
               controller.abort(new Error("publication retry cancelled"));
             }
@@ -330,9 +345,15 @@ describe("shared GitHub publication requester alias bindings", () => {
     },
   );
 
-  it.each(["local", "repository"] as const)(
-    "keeps an accepted %s request pending when profile preparation is unavailable",
-    async (backend) => {
+  it.each(
+    (["local", "repository"] as const).flatMap((backend) =>
+      (["profile preparation is unavailable", "a profile mutation is unsettled"] as const).map(
+        (availability) => ({ backend, availability }),
+      ),
+    ),
+  )(
+    "keeps an accepted $backend request pending when $availability",
+    async ({ backend, availability }) => {
       const f = await fixture(backend);
       const visitors = await prepareVisitorPublicationFixture(f);
       try {
@@ -368,20 +389,69 @@ describe("shared GitHub publication requester alias bindings", () => {
         }
         original.release();
         const restarted = f.restart();
-        const preparation = vi
-          .spyOn(userProfileList, "prepareUserProfileIdentity")
-          .mockRejectedValueOnce(new Error("synthetic profile read unavailable"));
+        const preparation = vi.spyOn(userProfileList, "prepareUserProfileIdentity");
+        const releasePublication = createDeferredCore();
+        let mutation: Promise<unknown> | undefined;
         try {
+          if (availability === "profile preparation is unavailable") {
+            preparation.mockRejectedValueOnce(new Error("synthetic profile read unavailable"));
+          } else {
+            const prepare = mocks.prepareIdentity.getMockImplementation()!;
+            mocks.prepareIdentity.mockImplementationOnce(async (...args) => {
+              const identity = await prepare(...args);
+              expect(preparation).toHaveBeenCalledOnce();
+              const nativeSettlement = createDeferredCore<string>();
+              const execute = stateWorker.runOpenClawStateWorkerOperation;
+              const delivery = vi
+                .spyOn(stateWorker, "runOpenClawStateWorkerOperation")
+                .mockImplementationOnce((context, operation, options) => {
+                  const admit = options?.createAdmission;
+                  if (!admit) {
+                    throw new Error("Expected the canonical profile write admission");
+                  }
+                  return execute(context, operation, {
+                    ...options,
+                    createAdmission: ({ settled }) =>
+                      admit({
+                        settled: settled.then(async (result) => {
+                          // Hold publication delivery after the real native transaction settles.
+                          nativeSettlement.resolve(result.kind);
+                          await releasePublication.promise;
+                          return result;
+                        }),
+                      }),
+                  });
+                });
+              try {
+                mutation = linkCanonicalUserProfileEmail(
+                  "publication-later-alias@example.test",
+                  f.guestProfile,
+                );
+                await expect(
+                  Promise.race([nativeSettlement.promise, mutation.then(() => "delivered")]),
+                ).resolves.toBe("completed");
+              } finally {
+                delivery.mockRestore();
+              }
+              return identity;
+            });
+          }
           await expect(restarted.resumeSessionRequests()).rejects.toBeInstanceOf(AggregateError);
           expect(preparation).toHaveBeenCalledOnce();
+          if (availability === "a profile mutation is unsettled") {
+            expect(mutation).toBeDefined();
+          }
           expect(restarted.read(queued.requestId)).toMatchObject({
             status: backend === "local" ? "publishing" : "requested",
           });
           expect(f.readRequester(queued.requestId)).toEqual(original.requester.snapshot);
           expect(f.readReceipt(queued.requestId)?.request_digest).toBe(accepted.request_digest);
+          expect(f.readReceipt(queued.requestId)?.error_code).toBeNull();
           expect(f.externalWrites).toEqual([]);
         } finally {
           preparation.mockRestore();
+          releasePublication.resolve();
+          await mutation;
         }
         await restarted.resumeSessionRequests();
         expect(restarted.read(queued.requestId)).toMatchObject({ status: "published" });
@@ -416,7 +486,7 @@ describe("shared GitHub publication requester alias bindings", () => {
       const prepare = mocks.prepareIdentity.getMockImplementation()!;
       mocks.prepareIdentity.mockImplementationOnce(async (...args) => {
         const identity = await prepare(...args);
-        linkEmail(later, f.guestProfile);
+        await linkCanonicalUserProfileEmail(later, f.guestProfile);
         const retry = await createGitHubPublicationRequesterFixture({
           profileId: f.guestProfile,
           scopes: guestScopes,
@@ -432,8 +502,10 @@ describe("shared GitHub publication requester alias bindings", () => {
       expect(original.requester.snapshot.grant?.aliasBindingIds).toHaveLength(1);
       expect(winningSnapshot?.grant?.aliasBindingIds).toHaveLength(2);
       expect(f.readRequester(admitted.requestId)).toEqual(winningSnapshot);
-      const other = ensureProfileForEmail("publication-alias-recipient@example.test");
-      linkEmail(later, other.id);
+      const other = await ensureCanonicalUserProfileForEmail(
+        "publication-alias-recipient@example.test",
+      );
+      await linkCanonicalUserProfileEmail(later, other.id);
       expect(original.requester.assertCurrent).not.toThrow();
       f.placements.releaseTurn(claim);
       original.release();

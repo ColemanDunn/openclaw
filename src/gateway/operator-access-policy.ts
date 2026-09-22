@@ -80,16 +80,60 @@ export function resolveGatewayOperatorAccessAuthority(
   if (profileId === GATEWAY_OWNER_PROFILE_ID) {
     return null;
   }
-  const policies = currentAccessPolicies();
-  if (policies.length === 0 && !hasGatewayOperatorAccessPolicies(config)) {
+  if (!hasGatewayOperatorAccessPolicies(config)) {
     return null;
   }
   const profile = getUserProfileListItem(profileId);
   const emails = [...profile.emails];
   let profileVersion = readUserProfileVersion();
+  return resolvePreparedGatewayOperatorAccessAuthority(
+    {
+      profileId: profile.id,
+      emails,
+      role: profile.role ?? null,
+      isCurrent: () => {
+        if (profile.id !== profileId) {
+          return false;
+        }
+        const currentVersion = readUserProfileVersion();
+        if (currentVersion !== profileVersion) {
+          const current = getUserProfileListItem(profileId);
+          const currentEmails = new Set(current.emails);
+          // A merge or alias replacement cannot transfer a captured grant to its successor.
+          // Display/avatar changes preserve admitted work.
+          if (current.id !== profileId || emails.some((email) => !currentEmails.has(email))) {
+            return false;
+          }
+          profileVersion = currentVersion;
+        }
+        return true;
+      },
+    },
+    config,
+  );
+}
+
+/** Worker-prepared person facts retain their owner's memory-only identity lifetime. */
+export function resolvePreparedGatewayOperatorAccessAuthority(
+  profile: Readonly<{
+    profileId: string;
+    emails: readonly string[];
+    role: string | null;
+    isCurrent: () => boolean;
+  }>,
+  config: OpenClawConfig,
+): GatewayOperatorAccessAuthority | null {
+  if (profile.profileId === GATEWAY_OWNER_PROFILE_ID) {
+    return null;
+  }
+  const policies = currentAccessPolicies();
+  if (policies.length === 0 && !hasGatewayOperatorAccessPolicies(config)) {
+    return null;
+  }
+  const emails = [...profile.emails];
   const requiredPlugin = resolveOperatorRolePolicyForAssignment(
-    profile.id,
-    profile.role ?? null,
+    profile.profileId,
+    profile.role,
     config,
   )?.accessPolicyPlugin;
   if (requiredPlugin && !policies.some((entry) => entry.pluginId === requiredPlugin)) {
@@ -107,19 +151,8 @@ export function resolveGatewayOperatorAccessAuthority(
   const assertProfileCurrent = () => {
     try {
       signal.throwIfAborted();
-      if (profile.id !== profileId) {
+      if (!profile.isCurrent()) {
         throw new GatewayOperatorAccessDeniedError();
-      }
-      const currentVersion = readUserProfileVersion();
-      if (currentVersion !== profileVersion) {
-        const current = getUserProfileListItem(profileId);
-        const currentEmails = new Set(current.emails);
-        // A merge or alias replacement cannot transfer a captured grant to its successor.
-        // Display/avatar changes leave these facts unchanged and preserve admitted work.
-        if (current.id !== profileId || emails.some((email) => !currentEmails.has(email))) {
-          throw new GatewayOperatorAccessDeniedError();
-        }
-        profileVersion = currentVersion;
       }
     } catch {
       throw invalidate();
@@ -131,11 +164,12 @@ export function resolveGatewayOperatorAccessAuthority(
   const releaseProfiles = watchProfileAccess(new WeakRef(assertProfileCurrent), token);
   profileAccessCleanup.register(assertProfileCurrent, releaseProfiles, token);
   try {
+    assertProfileCurrent();
     let requiredPolicyConfirmed = !requiredPlugin;
     const authorities = policies.flatMap(({ policy, pluginId }) => {
       const authority = policy.authorize({
         config,
-        profile: { profileId: profile.id, emails: [...emails], assignedRole: profile.role ?? null },
+        profile: { profileId: profile.profileId, emails: [...emails], assignedRole: profile.role },
         requiredByRole: pluginId === requiredPlugin,
       });
       if (authority && pluginId === requiredPlugin) {

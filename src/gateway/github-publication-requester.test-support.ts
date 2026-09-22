@@ -18,7 +18,11 @@ import {
   openOpenClawStateDatabase,
   runOpenClawStateWriteTransaction,
 } from "../state/openclaw-state-db.js";
-import { ensureProfileForEmail, listProfiles, setUserProfileRole } from "../state/user-profiles.js";
+import { listProfiles } from "../state/user-profile-reads.js";
+import {
+  ensureCanonicalUserProfileForEmail,
+  setCanonicalUserProfileRole,
+} from "../state/user-profile-writes.js";
 import { readGitHubPublicationRequest } from "./github-publication-store.js";
 import {
   createGitHubPublicationRequesterFixture,
@@ -53,9 +57,12 @@ async function createRequesterPolicySources(
   session: { sessionId: string; sessionKey: string },
   workspace: string,
 ) {
-  const guestProfile = ensureProfileForEmail("publication-guest@example.test").id;
-  const maintainerProfile = ensureProfileForEmail("publication-maintainer@example.test").id;
-  setUserProfileRole(maintainerProfile, "maintainer");
+  const guestProfile = (await ensureCanonicalUserProfileForEmail("publication-guest@example.test"))
+    .id;
+  const maintainerProfile = (
+    await ensureCanonicalUserProfileForEmail("publication-maintainer@example.test")
+  ).id;
+  await setCanonicalUserProfileRole(maintainerProfile, "maintainer");
   invalidateOperatorRolePolicy(maintainerProfile);
   const config: OpenClawConfig = {
     agents: { list: [{ id: "main", default: true, workspace }] },
@@ -117,8 +124,8 @@ async function createRequesterPolicySources(
     maintainerProfile,
     publishedTitles,
     externalWrites,
-    revoke() {
-      setUserProfileRole(guestProfile, "revoked");
+    async revoke() {
+      await setCanonicalUserProfileRole(guestProfile, "revoked");
       invalidateOperatorRolePolicy(guestProfile);
     },
   };

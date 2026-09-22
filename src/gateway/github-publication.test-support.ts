@@ -24,7 +24,7 @@ import {
   closeOpenClawStateDatabaseForTest,
   type OpenClawStateDatabase,
 } from "../state/openclaw-state-db.js";
-import { ensureProfileForEmail } from "../state/user-profiles.js";
+import { ensureCanonicalUserProfileForEmail } from "../state/user-profile-writes.js";
 import { currentGitHubPublicationConfig } from "./github-publication-availability.js";
 import {
   captureGitHubPublicationRequester,
@@ -381,7 +381,7 @@ export function installGitHubPublicationTestHarness(
               ? {
                   type: "human",
                   source: "profile",
-                  id: ensureProfileForEmail(harnessOptions.creatorEmail).id,
+                  id: (await ensureCanonicalUserProfileForEmail(harnessOptions.creatorEmail)).id,
                 }
               : undefined,
             sandbox: harnessOptions.sandbox,

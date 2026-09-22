@@ -98,7 +98,7 @@ describe("shared GitHub publication reconciliation", () => {
         const response = await transport(argv, options);
         if (argv.includes("push") || argv.includes("graphql")) {
           await observePush();
-          f.revoke();
+          await f.revoke();
           revoked = true;
           recoveryScanStart = hostScans.mock.calls.length;
           acceptedWrites = [...f.externalWrites];
@@ -186,7 +186,7 @@ describe("shared GitHub publication reconciliation", () => {
 
       // The accepted update survives a later close; its existing PR retains the original body.
       pullRequest.state = "closed";
-      f.revoke();
+      await f.revoke();
       expect(f.guest.assertCurrent).toThrow();
       readbackAvailable = true;
       const restarted = f.restart();

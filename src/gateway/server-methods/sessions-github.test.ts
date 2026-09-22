@@ -4,7 +4,8 @@ import { ErrorCodes, errorShape } from "../../../packages/gateway-protocol/src/i
 import { getRuntimeConfig } from "../../config/io.js";
 import { upsertSessionEntryCore } from "../../config/sessions/session-accessor.js";
 import { buildSessionCreationStamp } from "../../config/sessions/session-entry-provenance.js";
-import { ensureProfileForEmail, getUserProfileDisplay } from "../../state/user-profiles.js";
+import { ensureCanonicalUserProfileForEmail } from "../../state/user-profile-writes.js";
+import { getUserProfileDisplay } from "../../state/user-profiles.js";
 import { withOpenClawTestState } from "../../test-utils/openclaw-test-state.js";
 import {
   GitHubPublicationRequesterUnavailableError,
@@ -215,8 +216,8 @@ describe("sessions.github.publish", () => {
             },
           },
         });
-        const profile = ensureProfileForEmail("publisher@example.test");
-        const creator = ensureProfileForEmail("session-creator@example.test");
+        const profile = await ensureCanonicalUserProfileForEmail("publisher@example.test");
+        const creator = await ensureCanonicalUserProfileForEmail("session-creator@example.test");
         await upsertSessionEntryCore(
           { agentId: "main", sessionKey: "agent:main:main" },
           {

@@ -5,6 +5,7 @@ import {
   decodeGitHubPublicationRequester,
   type GitHubPublicationRequesterSnapshot,
 } from "../state/github-publication-requester.js";
+import { UserProfileMutationUnsettledError } from "../state/user-profile-events.js";
 import { prepareUserProfileIdentity } from "../state/user-profile-list.js";
 import type { UserProfileAccessFacts } from "../state/user-profiles.types.js";
 import { GitHubPublicationRequesterUnavailableError } from "./github-publication-failure.js";
@@ -89,7 +90,13 @@ function prepareRequesterPolicy(
         throw new GitHubPublicationRequesterUnavailableError();
       }
       return identity.readCurrentFacts(snapshot.grant?.aliasBindingIds);
-    } catch {
+    } catch (error) {
+      if (error instanceof UserProfileMutationUnsettledError) {
+        throw new GitHubPublicationRecoveryPendingError(
+          "GitHub publication identity authorization is unavailable; retry after the profile mutation settles.",
+          { cause: error },
+        );
+      }
       throw new GitHubPublicationRequesterUnavailableError();
     }
   };

@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { err, ok, type Result } from "@openclaw/normalization-core/result";
 import { expressionBuilder, type SelectQueryBuilder } from "kysely";
 import type { UserProfile as UserProfileListItem } from "../../packages/gateway-protocol/src/schema/users.js";
 import {
@@ -15,6 +16,7 @@ import {
   type OpenClawStateDatabaseOptions,
 } from "./openclaw-state-db.js";
 import { stageUserProfileEmailBindingChange } from "./user-profile-events.js";
+import type { UserProfileMutationContext } from "./user-profile-mutation.js";
 import {
   ensureUserProfilesSchema,
   hasEnsuredUserProfileRoleSchema,
@@ -22,6 +24,7 @@ import {
 } from "./user-profiles-schema.js";
 import type {
   ProfileDisplayRow,
+  UserProfileDisplay,
   UserProfileAvatarMime,
   UserProfileEmailBinding,
   UserProfileEmailBindingIndex,
@@ -36,6 +39,27 @@ const metadataReaders = new WeakMap<
   DatabaseSync,
   (profileId: string) => UserProfileMetadataRow | undefined
 >();
+
+export function insertUserProfile(
+  db: DatabaseSync,
+  displayName: string | null,
+  now: number,
+  mutation?: UserProfileMutationContext,
+): UserProfileRow {
+  const row: UserProfileRow = {
+    id: generateSecureUuid(),
+    display_name: displayName,
+    avatar: null,
+    avatar_mime: null,
+    avatar_sha256: null,
+    merged_into: null,
+    created_at: now,
+    updated_at: now,
+  };
+  mutation?.before(db, row.id);
+  executeSqliteQuerySync(db, userProfilesDb(db).insertInto("user_profiles").values(row));
+  return row;
+}
 
 export function toUserProfile(row: Omit<UserProfileMetadataRow, "avatar_sha256">): UserProfile {
   return {
@@ -265,7 +289,9 @@ export function getProfileAvatar(
     : undefined;
 }
 
-export function projectUserProfileDisplay(profile: Omit<ProfileDisplayRow, "role">) {
+export function projectUserProfileDisplay(
+  profile: Omit<ProfileDisplayRow, "role">,
+): UserProfileDisplay {
   const avatarMime = normalizeUserProfileAvatarMime(profile.avatar_mime);
   return {
     id: profile.id,
@@ -276,4 +302,47 @@ export function projectUserProfileDisplay(profile: Omit<ProfileDisplayRow, "role
         : String(profile.updated_at),
     hasAvatar: profile.has_avatar === 1,
   };
+}
+
+/** Prefix references navigate display rows; they never select an authentication identity. */
+export function matchUserProfileReference(
+  reference: string,
+  exact: string | undefined,
+  readMatches: (prefix: string) => string[],
+): Result<string | undefined, "ambiguous"> {
+  if (exact !== undefined || !/^[0-9a-f]{8,32}$/.test(reference)) {
+    return ok<string | undefined, "ambiguous">(exact);
+  }
+  const prefix = [0, 8, 12, 16, 20]
+    .map((start, index, offsets) => reference.slice(start, offsets[index + 1]))
+    .filter(Boolean)
+    .join("-");
+  const matches = new Set(readMatches(prefix));
+  return matches.size > 1
+    ? err<string | undefined, "ambiguous">("ambiguous")
+    : ok<string | undefined, "ambiguous">(matches.values().next().value);
+}
+
+export function resolveCatalogProfile(rows: Map<string, ProfileDisplayRow>, id: string) {
+  const raw = rows.get(id);
+  return rows.get(raw?.merged_into ?? id) ?? raw;
+}
+
+/** Project exact identity facts from the catalogue owner's current rows. */
+export function projectCatalogUserProfileIdentity(
+  resident: Map<string, ProfileDisplayRow>,
+  profileId: string,
+) {
+  const profile = resolveCatalogProfile(resident, profileId);
+  return (
+    profile && {
+      profileId: profile.id,
+      role: profile.role ?? null,
+      aliases: new Set(
+        [...resident.values()]
+          .filter((row) => row.id === profile.id || row.merged_into === profile.id)
+          .map((row) => row.id),
+      ),
+    }
+  );
 }

@@ -20,7 +20,11 @@ import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { setRuntimeConfigSnapshot } from "../config/config.js";
 import { getPluginRegistryState } from "../plugins/runtime-state.js";
 import { openOpenClawStateDatabase } from "../state/openclaw-state-db.js";
-import { ensureProfileForEmail, linkEmail, setUserProfileRole } from "../state/user-profiles.js";
+import {
+  ensureCanonicalUserProfileForEmail,
+  linkCanonicalUserProfileEmail,
+  setCanonicalUserProfileRole,
+} from "../state/user-profile-writes.js";
 import { GitHubPublicationRequesterUnavailableError } from "./github-publication-failure.js";
 import { GitHubPublicationRecoveryPendingError } from "./github-publication-git-index.js";
 import { captureGitHubPublicationRequester } from "./github-publication-requester.js";
@@ -238,8 +242,10 @@ describe("shared GitHub publication requester authority", () => {
     async ({ backend, change }) => {
       const f = await fixture(backend);
       const email = "publication-guest@example.test";
-      linkEmail("publication-secondary@example.test", f.guestProfile);
-      const other = ensureProfileForEmail("publication-alias-recipient@example.test");
+      await linkCanonicalUserProfileEmail("publication-secondary@example.test", f.guestProfile);
+      const other = await ensureCanonicalUserProfileForEmail(
+        "publication-alias-recipient@example.test",
+      );
       const visitors = await prepareVisitorPublicationFixture(f);
       const availability: { restore?: () => void; reached: boolean } = { reached: false };
       try {
@@ -277,8 +283,8 @@ describe("shared GitHub publication requester authority", () => {
               if (change === "policy unavailable") {
                 availability.restore = visitors.suspendRegistry();
               } else {
-                linkEmail(email, other.id);
-                linkEmail(email, f.guestProfile);
+                await linkCanonicalUserProfileEmail(email, other.id);
+                await linkCanonicalUserProfileEmail(email, f.guestProfile);
               }
               availability.reached = true;
             }
@@ -331,7 +337,7 @@ describe("shared GitHub publication requester authority", () => {
         const result = await transport(argv, options);
         if (!refAccepted && argv.includes("update-ref") && result.code === 0) {
           refAccepted = true;
-          f.revoke();
+          await f.revoke();
           if (outcome === "response lost") {
             throw new Error("Synthetic accepted ref response lost");
           }
@@ -400,12 +406,12 @@ describe("shared GitHub publication requester authority", () => {
       f.placements.markWorkspaceResultPending(claim);
       await f.coordinator.prepareClaimWorkspace(claim);
       f.placements.acceptWorkspaceResult(claim);
-      f.revoke();
+      await f.revoke();
       await f.coordinator.processClaim(claim);
     } else {
       f.placements.releaseTurn(claim);
       f.coordinator.deferOrphanedRequests();
-      f.revoke();
+      await f.revoke();
       await f.restart().resumeSessionRequests();
     }
 
@@ -536,7 +542,7 @@ describe("shared GitHub publication requester authority", () => {
         ).rejects.toThrow(
           "GitHub publication idempotency key was reused by a different requester.",
         );
-        setUserProfileRole(f.guestProfile, "maintainer");
+        await setCanonicalUserProfileRole(f.guestProfile, "maintainer");
         invalidateOperatorRolePolicy(f.guestProfile);
         expect(original.requester.assertCurrent).toThrow(
           GitHubPublicationRequesterUnavailableError,
@@ -597,7 +603,7 @@ describe("shared GitHub publication requester authority", () => {
     const f = await fixture("local");
     const claim = holdWorkerTurn(f);
     const accepted = await f.coordinator.requestForSession(f.request("merged-requester", f.guest));
-    linkEmail("publication-guest@example.test", f.maintainerProfile);
+    await linkCanonicalUserProfileEmail("publication-guest@example.test", f.maintainerProfile);
     f.placements.releaseTurn(claim);
     const restarted = f.restart();
     await restarted.resumeSessionRequests();
@@ -641,7 +647,7 @@ describe("shared GitHub publication requester authority", () => {
             ? argv.includes("push") || argv.includes("graphql")
             : argv.includes("POST") && argv.some((arg) => arg.endsWith("/pulls"))
         ) {
-          f.revoke();
+          await f.revoke();
         }
         return result;
       });
@@ -686,7 +692,7 @@ describe("shared GitHub publication requester authority", () => {
       expect(published.status).toBe("published");
       const writes = [...f.externalWrites];
       f.removeRequesterSnapshot(published.requestId);
-      f.revoke();
+      await f.revoke();
       const restarted = f.restart();
       await restarted.resumeSessionRequests();
       expect(restarted.read(published.requestId)).toEqual(published);
@@ -892,7 +898,7 @@ describe("shared GitHub publication requester authority", () => {
       expect(responseLost).toBe(true);
       expect(f.readReceipt(requestId)?.pull_request_url).toBeNull();
       const acceptedWrites = [...writes];
-      f.revoke();
+      await f.revoke();
       expect(f.guest.assertCurrent).toThrow();
       const restarted = f.restart();
       const readsBeforeRecovery = unavailableReads;
