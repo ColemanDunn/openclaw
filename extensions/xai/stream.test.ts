@@ -92,6 +92,7 @@ function runXaiToolPayloadWrapper(params: {
   input?: string[];
   provider?: string;
   baseUrl?: string;
+  fastMode?: boolean;
 }) {
   const baseStreamFn: StreamFn = (_model, _context, options) => {
     options?.onPayload?.(params.payload, {} as Model<XaiStreamApi>);
@@ -99,7 +100,7 @@ function runXaiToolPayloadWrapper(params: {
   };
   const wrapped = wrapXaiProviderStream({
     streamFn: baseStreamFn,
-    extraParams: { tool_stream: false },
+    extraParams: { tool_stream: false, fastMode: params.fastMode },
   } as never);
   const api = params.api ?? "openai-responses";
 
@@ -122,9 +123,9 @@ function runXaiToolPayloadWrapper(params: {
 it.each([
   { modelId: "grok-3", target: "grok-3-fast", supported: true },
   { modelId: "grok-4-0709", target: "grok-4-fast", supported: true },
-  { modelId: "grok-4.3", target: "grok-4.3", supported: false },
-  { modelId: "grok-3-fast", target: "grok-3-fast", supported: false },
-])("publishes the actual Fast mapping for $modelId", ({ modelId, target, supported }) => {
+  { modelId: "grok-4.3", target: "grok-4.3", supported: undefined },
+  { modelId: "grok-3-fast", target: "grok-3-fast", supported: undefined },
+])("publishes Fast support without an endpoint for $modelId", ({ modelId, target, supported }) => {
   expect(
     resolveFastModeSupport({
       modelId,
@@ -136,6 +137,30 @@ it.each([
   ).toBe(supported);
   expect(captureWrappedModelId({ modelId, fastMode: true })).toBe(target);
   expect(captureWrappedModelId({ modelId, fastMode: false })).toBe(modelId);
+});
+
+it.each([
+  ["https://api.x.ai/v1", true, undefined, "priority"],
+  ["https://cli-chat-proxy.grok.com/v1/", true, undefined, "priority"],
+  ["https://api.x.ai/v1", false, undefined, undefined],
+  ["https://api.x.ai/v1", true, "default", "default"],
+  ["https://proxy.example/v1", true, undefined, undefined],
+  ["https://api.x.ai/v1/other", true, undefined, undefined],
+] as const)("applies Fast to %s (enabled=%s, tier=%s)", (baseUrl, fastMode, tier, expected) => {
+  const payload = { service_tier: tier, reasoning: { effort: "high" } };
+  runXaiToolPayloadWrapper({ payload, baseUrl, fastMode, modelId: "grok-future" });
+  expect(payload.service_tier).toBe(expected);
+  expect(payload.reasoning).toEqual({ effort: "high" });
+  expect(
+    resolveFastModeSupport({
+      provider: "xai",
+      modelId: "grok-future",
+      api: "openai-responses",
+      baseUrl,
+      runtimeId: "openclaw",
+      requestCapabilities: { endpointClass: "custom", allowsAnthropicServiceTier: false },
+    }),
+  ).toBe(baseUrl === "https://api.x.ai/v1" || baseUrl === "https://cli-chat-proxy.grok.com/v1/");
 });
 
 async function captureXaiResponsesPayloadWithThinking(
