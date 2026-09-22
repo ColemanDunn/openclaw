@@ -644,6 +644,9 @@ export async function executeGitHubPublication<Row extends PublicationRow>(param
       assertAuthority();
       return params.projectResult(params.interrupt());
     }
+    // A head on entry belongs to an earlier attempt; current preparation updates row.
+    // It can carry unconfirmed GitHub effects, not proof that a write was dispatched.
+    // Shared recovery restores the original requester before attempting new actions.
     if (
       !params.interrupt &&
       (effectDispatched || initial.head_commit) &&

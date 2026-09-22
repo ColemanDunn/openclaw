@@ -10,6 +10,7 @@ import { resolveGitHubPublicationFailure } from "./github-publication-failure.js
 import {
   BASE_HEAD,
   BRANCH,
+  NEW_HEAD,
   SESSION_ID,
   SESSION_KEY,
   WORKSPACE_TREE,
@@ -565,30 +566,42 @@ describe("Gateway GitHub publication boundaries", () => {
     expect(commands.some((argv) => argv.includes("push") || argv.includes("POST"))).toBe(false);
   });
 
-  it("reports missing managed credentials as an identity failure after admission", async () => {
-    const database = openOpenClawStateDatabase({ env: { OPENCLAW_STATE_DIR: root } });
-    const coordinator = createTestGitHubPublicationCoordinator({
-      placements: createWorkerSessionPlacementStore({ database }),
-    });
-    coordinator.read("create-schema");
-    const requestId = "publication-missing-credential";
-    seedLocalPublication(database, { requestId, status: "requested", headCommit: null });
-    const config = { tools: { github: { profileId: "ghp_11111111111111111111111111111111" } } };
-    mocks.getConfigSnapshot.mockReturnValue({ config, sourceConfig: config });
-    const { prepareGitHubPublicationIdentity } = await vi.importActual<
-      typeof import("../agents/github-tool-identity.js")
-    >("../agents/github-tool-identity.js");
-    mocks.prepareIdentity.mockImplementation(prepareGitHubPublicationIdentity);
+  it.each(["fresh", "historical"] as const)(
+    "preserves %s publication outcomes when managed credentials are unavailable",
+    async (attempt) => {
+      const database = openOpenClawStateDatabase({ env: { OPENCLAW_STATE_DIR: root } });
+      const coordinator = createTestGitHubPublicationCoordinator({
+        placements: createWorkerSessionPlacementStore({ database }),
+      });
+      coordinator.read("create-schema");
+      const requestId = "publication-missing-credential";
+      seedLocalPublication(database, {
+        requestId,
+        status: "requested",
+        headCommit: attempt === "fresh" ? null : NEW_HEAD,
+      });
+      const config = { tools: { github: { profileId: "ghp_11111111111111111111111111111111" } } };
+      mocks.getConfigSnapshot.mockReturnValue({ config, sourceConfig: config });
+      const { prepareGitHubPublicationIdentity } = await vi.importActual<
+        typeof import("../agents/github-tool-identity.js")
+      >("../agents/github-tool-identity.js");
+      mocks.prepareIdentity.mockImplementation(prepareGitHubPublicationIdentity);
 
-    await coordinator.resumeSessionRequests();
-
-    expect(coordinator.read(requestId)).toMatchObject({
-      status: "failed",
-      code: "identity_unavailable",
-      nextAction: expect.stringContaining("Reconnect"),
-    });
-    expect(commands.some((argv) => argv.includes("push") || argv.includes("POST"))).toBe(false);
-  });
+      const resumed = coordinator.resumeSessionRequests();
+      if (attempt === "historical") {
+        await expect(resumed).rejects.toThrow("GitHub publication is unconfirmed");
+        expect(coordinator.read(requestId)).toMatchObject({ status: "publishing" });
+      } else {
+        await resumed;
+        expect(coordinator.read(requestId)).toMatchObject({
+          status: "failed",
+          code: "identity_unavailable",
+          nextAction: expect.stringContaining("Reconnect"),
+        });
+      }
+      expect(commands.some((argv) => argv.includes("push") || argv.includes("POST"))).toBe(false);
+    },
+  );
 
   it("terminalizes local recovery when the managed worktree fingerprint changed", async () => {
     const database = openOpenClawStateDatabase({ env: { OPENCLAW_STATE_DIR: root } });
@@ -660,42 +673,54 @@ describe("Gateway GitHub publication boundaries", () => {
     expect(commands).toEqual([]);
   });
 
-  it("rejects unsafe Git configuration before starting recovery probes", async () => {
-    const database = openOpenClawStateDatabase({ env: { OPENCLAW_STATE_DIR: root } });
-    const coordinator = createTestGitHubPublicationCoordinator({
-      placements: createWorkerSessionPlacementStore({ database }),
-    });
-    coordinator.read("create-schema");
-    const requestId = "publication-unsafe-recovery";
-    seedLocalPublication(database, { requestId, status: "requested", headCommit: null });
-    mocks.findWorktreeById.mockReturnValue({
-      id: "worktree-1",
-      repoRoot: "/repo",
-      repoFingerprint: "fingerprint-1",
-      path: "/repo/worktree",
-      branch: BRANCH,
-      baseRef: "origin/main",
-      ownerKind: "session",
-      ownerId: SESSION_KEY,
-    });
-    const fallback = mocks.runCommand.getMockImplementation()!;
-    mocks.runCommand.mockImplementation(async (argv: string[], options?: { input?: string }) => {
-      if (argv.includes("--local") && argv.includes("--get-regexp")) {
-        return commandResult("core.fsmonitor ./untrusted-monitor\n");
+  it.each(["fresh", "historical"] as const)(
+    "preserves %s publication outcomes before probing unsafe Git configuration",
+    async (attempt) => {
+      const database = openOpenClawStateDatabase({ env: { OPENCLAW_STATE_DIR: root } });
+      const coordinator = createTestGitHubPublicationCoordinator({
+        placements: createWorkerSessionPlacementStore({ database }),
+      });
+      coordinator.read("create-schema");
+      const requestId = "publication-unsafe-recovery";
+      seedLocalPublication(database, {
+        requestId,
+        status: "requested",
+        headCommit: attempt === "fresh" ? null : NEW_HEAD,
+      });
+      mocks.findWorktreeById.mockReturnValue({
+        id: "worktree-1",
+        repoRoot: "/repo",
+        repoFingerprint: "fingerprint-1",
+        path: "/repo/worktree",
+        branch: BRANCH,
+        baseRef: "origin/main",
+        ownerKind: "session",
+        ownerId: SESSION_KEY,
+      });
+      const fallback = mocks.runCommand.getMockImplementation()!;
+      mocks.runCommand.mockImplementation(async (argv: string[], options?: { input?: string }) => {
+        if (argv.includes("--local") && argv.includes("--get-regexp")) {
+          return commandResult("core.fsmonitor ./untrusted-monitor\n");
+        }
+        return await fallback(argv, options);
+      });
+
+      const resumed = coordinator.resumeSessionRequests();
+      if (attempt === "historical") {
+        await expect(resumed).rejects.toThrow("GitHub publication is unconfirmed");
+        expect(coordinator.read(requestId)).toMatchObject({ status: "publishing" });
+      } else {
+        await resumed;
+        expect(coordinator.read(requestId)).toMatchObject({
+          status: "failed",
+          code: "workspace_changed",
+        });
       }
-      return await fallback(argv, options);
-    });
-
-    await coordinator.resumeSessionRequests();
-
-    expect(coordinator.read(requestId)).toMatchObject({
-      status: "failed",
-      code: "workspace_changed",
-    });
-    expect(commands.some((argv) => argv.join(" ") === "git rev-parse --git-path index")).toBe(
-      false,
-    );
-  });
+      expect(commands.some((argv) => argv.join(" ") === "git rev-parse --git-path index")).toBe(
+        false,
+      );
+    },
+  );
 
   it.each([
     { label: "no live claim", claimRunId: undefined, expectedRunId: undefined },
