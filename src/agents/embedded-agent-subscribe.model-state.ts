@@ -103,6 +103,7 @@ export function createEmbeddedModelState(
     }
     publishedMessageModel = identity;
   };
+  const providerNotices = new Map<string, string>();
 
   const recordPendingUsage = (raw: Usage) => {
     const usage = normalizeUsage(raw);
@@ -170,6 +171,24 @@ export function createEmbeddedModelState(
         return;
       }
       publishMessageModel(message, evt.type === "message_start");
+      if (evt.type === "message_end" || evt.type === "turn_end") {
+        for (const diagnostic of message.diagnostics ?? []) {
+          const code = diagnostic.details?.code;
+          const text = diagnostic.details?.text;
+          if (
+            diagnostic.type === "provider_notice" &&
+            typeof code === "string" &&
+            code.length > 0 &&
+            code.length <= 64 &&
+            typeof text === "string" &&
+            text.trim().length > 0 &&
+            text.length <= 500 &&
+            (providerNotices.has(code) || providerNotices.size < 8)
+          ) {
+            providerNotices.set(code, text.trim());
+          }
+        }
+      }
       switch (evt.type) {
         case "turn_end":
           // Async tool fragments emit message_end before the provider response finishes.
@@ -216,5 +235,6 @@ export function createEmbeddedModelState(
     getLastAssistantUsage: () => normalizeUsage(lastUsage),
     getCurrentAttemptAssistant: () => (completed ? structuredClone(completed) : undefined),
     hasSuccessfulModelResponse: () => successfulModelResponse,
+    getProviderNotices: () => [...providerNotices.values()],
   };
 }

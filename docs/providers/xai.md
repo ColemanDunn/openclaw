@@ -211,6 +211,33 @@ transcription, xAI's Grok Voice Agent WebSocket for Talk realtime sessions,
 and the Responses API for chat, search, and code-execution tools.
 </Note>
 
+### Fast mode
+
+`/fast on` requests xAI [Priority Processing](https://docs.x.ai/developers/advanced-api-usage/priority-processing)
+by sending `service_tier: "priority"` on text requests to the public xAI API or
+Grok OAuth endpoint. It keeps the selected model and reasoning level unchanged.
+OpenClaw does not maintain a model allowlist for this request; xAI determines
+whether the selected model and account can receive priority.
+
+`/fast off` stops requesting priority. `/fast auto` decides per model call using
+the [shared fast-mode cutoff](/tools/thinking#fast-mode-fast). Existing explicit
+payload tiers are preserved. Third-party proxy endpoints are unchanged.
+xAI may charge a premium for priority processing; the returned `service_tier`
+indicates which tier was actually used.
+
+If xAI explicitly returns `default` after a priority request, OpenClaw adds one
+status notice to the completed interactive reply, including when the downgrade
+occurred during a tool call. The reply remains successful. Missing tier metadata
+does not trigger a notice; silent and background turns remain quiet.
+
+If xAI rejects an automatically added tier with HTTP 400 and
+`Argument not supported: service_tier` before any stream output, OpenClaw retries
+once without that tier. A successful recovery includes the standard-processing
+notice. Explicit payload tiers and all other errors are left unchanged.
+
+The Control UI enables Fast for these routes. Availability means OpenClaw can
+request priority, not that xAI guarantees priority access or lower latency.
+
 ### Legacy fast-mode compatibility
 
 `/fast on` or `agents.defaults.models["xai/<model>"].params.fastMode: true`

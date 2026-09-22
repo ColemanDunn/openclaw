@@ -10,6 +10,7 @@ import type {
   ModelDefinitionConfig,
   ModelProviderConfig,
 } from "openclaw/plugin-sdk/provider-model-shared";
+import { XAI_GROK_OAUTH_BASE_URL } from "./base-url.js";
 import {
   buildXaiCatalogModels,
   resolveXaiCatalogEntry,
@@ -22,24 +23,12 @@ import {
 
 const PROVIDER_ID = "xai";
 const XAI_MODELS_ENDPOINT = `${XAI_BASE_URL}/models`;
-const XAI_GROK_OAUTH_BASE_URL = "https://cli-chat-proxy.grok.com/v1";
 const XAI_GROK_OAUTH_MODELS_ENDPOINT = `${XAI_GROK_OAUTH_BASE_URL}/models`;
 const XAI_MODELS_CACHE_TTL_MS = 60_000;
 const XAI_GROK_OAUTH_MODELS_CACHE_TTL_MS = 60_000;
 // Composer emits replayable Responses reasoning, but the OAuth catalog omits that capability.
 // Keep it classified here or the stream wrapper will omit encrypted reasoning from replay.
 const XAI_GROK_OAUTH_REASONING_MODEL_IDS = new Set(["grok-composer-2.5-fast"]);
-
-export function isXaiGrokProxyBaseUrl(baseUrl: string | undefined): boolean {
-  if (!baseUrl) {
-    return false;
-  }
-  try {
-    return new URL(baseUrl).href.replace(/\/+$/u, "") === XAI_GROK_OAUTH_BASE_URL;
-  } catch {
-    return false;
-  }
-}
 
 export function buildXaiProvider(
   api: ModelProviderConfig["api"] = "openai-responses",

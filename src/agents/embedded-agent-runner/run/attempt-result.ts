@@ -42,6 +42,7 @@ export function createAttemptCarryover() {
   let latestMcpConnectAction: EmbeddedRunAttemptResult["latestMcpConnectAction"];
   let heartbeatToolResponse: EmbeddedRunAttemptResult["heartbeatToolResponse"];
   let modelAttempt: AgentRuntimeModelAttempt | undefined;
+  let providerNotices: string[] = [];
   return {
     apply(
       attempt: Pick<
@@ -50,6 +51,7 @@ export function createAttemptCarryover() {
         | "latestMcpConnectAction"
         | "heartbeatToolResponse"
         | "modelAttempt"
+        | "providerNotices"
       >,
     ): void {
       modelAttempt = attempt.modelAttempt;
@@ -59,6 +61,12 @@ export function createAttemptCarryover() {
       attempt.latestMcpConnectAction = latestMcpConnectAction;
       heartbeatToolResponse = attempt.heartbeatToolResponse ?? heartbeatToolResponse;
       attempt.heartbeatToolResponse = heartbeatToolResponse;
+      providerNotices = [
+        ...new Set([...providerNotices, ...(attempt.providerNotices ?? [])]),
+      ].slice(0, 8);
+      if (providerNotices.length > 0) {
+        attempt.providerNotices = providerNotices;
+      }
     },
     get modelAttempt() {
       return modelAttempt;
@@ -365,6 +373,7 @@ export function completeEmbeddedAttemptResult(
     currentAttemptReplayMetadata,
     itemLifecycle: getItemLifecycle(),
     assistantTurns: getAssistantTurnCount(),
+    providerNotices: subscription.getProviderNotices(),
     setTerminalLifecycleMeta,
     bootstrapPromptWarningSignaturesSeen: bootstrapPromptWarning.warningSignaturesSeen,
     bootstrapPromptWarningSignature: bootstrapPromptWarning.signature,

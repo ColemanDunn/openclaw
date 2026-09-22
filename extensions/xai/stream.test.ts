@@ -122,9 +122,9 @@ function runXaiToolPayloadWrapper(params: {
 it.each([
   { modelId: "grok-3", target: "grok-3-fast", supported: true },
   { modelId: "grok-4-0709", target: "grok-4-fast", supported: true },
-  { modelId: "grok-4.3", target: "grok-4.3", supported: false },
-  { modelId: "grok-3-fast", target: "grok-3-fast", supported: false },
-])("publishes the actual Fast mapping for $modelId", ({ modelId, target, supported }) => {
+  { modelId: "grok-4.3", target: "grok-4.3", supported: undefined },
+  { modelId: "grok-3-fast", target: "grok-3-fast", supported: undefined },
+])("publishes Fast support without an endpoint for $modelId", ({ modelId, target, supported }) => {
   expect(
     resolveFastModeSupport({
       modelId,

@@ -43,6 +43,7 @@ import {
   type OpenAICompletionsTextSource,
   type OpenAIModeModel,
 } from "./openai-transport-shared.js";
+import { recordProviderServiceTier } from "./transport-stream-shared.js";
 
 type OpenAICompatibleChoice = ChatCompletionChunk["choices"][number] & {
   // Some compatible providers attach usage per choice instead of per chunk.
@@ -471,6 +472,7 @@ export async function processCompletionsStream(
     // Hidden reasoning is still provider progress; keep the idle watchdog alive without exposing it.
     notifyLlmRequestActivity(options?.signal);
     const chunk = rawChunk as OpenAICompatibleChatCompletionChunk;
+    recordProviderServiceTier(output, chunk.service_tier);
     output.responseId ||= chunk.id;
     // Retain the provider-returned model when it differs from the requested id so
     // routed/alias responses are not misattributed, matching the direct provider

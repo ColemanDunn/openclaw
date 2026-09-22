@@ -374,6 +374,7 @@ export type EmbeddedRunAttemptResult = {
   assistantTexts: string[];
   /** Immutable delivery facts prepared before a remote harness releases its file reader. */
   preparedReplyMedia?: import("../../../auto-reply/reply/reply-media-paths.js").PreparedReplyMedia;
+  providerNotices?: string[];
   latestMcpAppChannelView?: McpAppChannelView;
   latestMcpConnectAction?: McpConnectAction;
   lastAssistantTextMessageIndex?: number;

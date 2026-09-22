@@ -3,7 +3,7 @@ import type {
   ProviderThinkingProfile,
 } from "openclaw/plugin-sdk/plugin-entry";
 import type { ProviderFastModePolicyContext } from "openclaw/plugin-sdk/provider-model-types";
-import { resolveXaiFastModelId } from "./fast-mode.js";
+import { resolveXaiFastModelId, supportsXaiPriorityProcessing } from "./fast-mode.js";
 import { resolveXaiCatalogEntry } from "./model-definitions.js";
 import { isXaiFrontierModelId, isXaiGrok46ModelId, normalizeXaiModelId } from "./model-id.js";
 import { isXaiProviderId } from "./provider-id.js";
@@ -12,9 +12,12 @@ export function resolveFastModeSupport(ctx: ProviderFastModePolicyContext): bool
   if (!ctx.api || ctx.runtimeId !== "openclaw") {
     return undefined;
   }
-  return (
+  if (
     resolveXaiFastModelId({ id: ctx.modelId, provider: ctx.provider, api: ctx.api }) !== undefined
-  );
+  ) {
+    return true;
+  }
+  return ctx.baseUrl ? supportsXaiPriorityProcessing(ctx) : undefined;
 }
 
 export function resolveThinkingProfile(

@@ -56,6 +56,7 @@ export function subscribeEmbeddedAgentSession(params: SubscribeEmbeddedAgentSess
     getLastAssistantUsage,
     getCurrentAttemptAssistant,
     hasSuccessfulModelResponse,
+    getProviderNotices,
   } = createEmbeddedModelState(params, log);
   let compactionCount = 0;
   const assistantTexts = state.assistantTexts;
@@ -494,6 +495,7 @@ export function subscribeEmbeddedAgentSession(params: SubscribeEmbeddedAgentSess
       }),
     didSendDeterministicApprovalPrompt: () => state.deterministicApprovalPromptSent,
     getLastToolError: () => (state.lastToolError ? { ...state.lastToolError } : undefined),
+    getProviderNotices,
     getUsageTotals,
     getLastAssistantUsage,
     getCompactionCount: () => compactionCount,

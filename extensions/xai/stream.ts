@@ -8,9 +8,10 @@ import {
   createToolStreamWrapper,
 } from "openclaw/plugin-sdk/provider-stream-shared";
 import { asOptionalRecord, filterStringEntries } from "openclaw/plugin-sdk/string-coerce-runtime";
-import { resolveXaiFastModelId } from "./fast-mode.js";
+import { isXaiGrokProxyBaseUrl } from "./base-url.js";
+import { resolveXaiFastModelId, supportsXaiPriorityProcessing } from "./fast-mode.js";
 import { XAI_BASE_URL } from "./model-definitions.js";
-import { isXaiGrokProxyBaseUrl } from "./provider-catalog.js";
+import { streamXaiPriority } from "./priority-stream.js";
 import { isXaiProviderId } from "./provider-id.js";
 
 type DynamicFastMode = boolean | (() => boolean | undefined);
@@ -221,13 +222,13 @@ function createXaiFastModeWrapper(
     if ((typeof fastMode === "function" ? fastMode() : fastMode) !== true) {
       return underlying(model, context, options);
     }
-
     const fastModelId = resolveXaiFastModelId(model);
-    if (!fastModelId) {
-      return underlying(model, context, options);
+    if (fastModelId) {
+      return underlying({ ...model, id: fastModelId }, context, options);
     }
-
-    return underlying({ ...model, id: fastModelId }, context, options);
+    return supportsXaiPriorityProcessing(model)
+      ? streamXaiPriority(underlying, model, context, options)
+      : underlying(model, context, options);
   };
 }
 

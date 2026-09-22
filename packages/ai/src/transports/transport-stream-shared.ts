@@ -28,6 +28,22 @@ import { parseJsonObjectPreservingUnsafeIntegers } from "./json-unsafe-integers.
 
 type ContextUsage = NonNullable<Usage["contextUsage"]>;
 
+export function recordProviderServiceTier(message: AssistantMessage, serviceTier: unknown): void {
+  if (serviceTier !== "default" && serviceTier !== "priority") {
+    return;
+  }
+  const existing = message.diagnostics?.find((entry) => entry.type === "provider_service_tier");
+  if (existing) {
+    existing.details = { serviceTier };
+    return;
+  }
+  appendAssistantMessageDiagnostic(message, {
+    type: "provider_service_tier",
+    timestamp: Date.now(),
+    details: { serviceTier },
+  });
+}
+
 type TransportUsage = {
   input: number;
   output: number;
