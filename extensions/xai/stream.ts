@@ -10,8 +10,8 @@ import {
 import { asOptionalRecord, filterStringEntries } from "openclaw/plugin-sdk/string-coerce-runtime";
 import { resolveXaiFastModelId, supportsXaiPriorityProcessing } from "./fast-mode.js";
 import { XAI_BASE_URL } from "./model-definitions.js";
-import { isXaiGrokProxyBaseUrl } from "./provider-catalog.js";
-import { isXaiBaseUrl, isXaiProviderId } from "./provider-id.js";
+import { isXaiBaseUrl, isXaiGrokProxyBaseUrl } from "./provider-catalog.js";
+import { isXaiProviderId } from "./provider-id.js";
 
 type DynamicFastMode = boolean | (() => boolean | undefined);
 
