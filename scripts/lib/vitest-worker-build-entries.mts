@@ -46,6 +46,7 @@ import {
 } from "../../src/state/openclaw-state-lease-runtime.test-support.ts";
 import { groqSetupSdkEntrypoints } from "../../src/system-agent/setup-inference-groq-sdk.test-support.ts";
 import { tuiPtyRuntimeEntrypoints } from "../../src/tui/tui-pty-runtime-test-support.ts";
+import { workerBackgroundExecEntrypoints } from "../../src/worker/worker-runtime-background-exec-entrypoints.test-support.ts";
 import { channelIngressGatewayRestartEntrypoint } from "../../test/fixtures/channel-ingress-gateway-restart-entrypoint.ts";
 import { runtimeProcessBuildEntrypoints } from "./runtime-process-build-entries.mts";
 import { createRuntimeProcessBuildEntries } from "./runtime-process-core-build-entries.mts";
@@ -74,6 +75,7 @@ export const legacyFinalizerBuildSources = [
   "src/cli/daemon-cli/restart-health.ts",
   "src/commands/doctor/shared/legacy-config-binding-repair.runtime.ts",
   "src/cli/update-cli/update-command-legacy-finalize.test-support.ts",
+  "src/cli/update-cli/update-command-migrated-fixture.test-support.ts",
   "src/infra/update-migrated-finalize.worker.ts",
   "src/infra/runtime-process-entrypoints.ts",
   "src/cli/update-cli/update-command-service-plan.ts",
@@ -125,6 +127,7 @@ export const vitestWorkerBuildEntries = {
     ...Object.values(sessionTitleRetentionEntrypoints),
     sessionChildCacheRetentionEntrypoint,
     nodeHostConfigRuntimeEntrypoint,
+    ...Object.values(workerBackgroundExecEntrypoints),
     channelIngressGatewayRestartEntrypoint,
     persistenceRuntimeEntrypoint,
     gitBackupCommandRuntimeEntrypoint,

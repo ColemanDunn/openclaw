@@ -185,8 +185,7 @@ export async function findGitHubPublicationPullRequest(params: {
       nextAction: "Check pull-request permission for the effective account, then retry.",
     });
   }
-  // This is an accepted observation, not permission for another effect.
-  // Its caller can settle the receipt; every later action checks authority.
+  // A matching accepted result settles its receipt; later actions still check authority.
   if (found) {
     return found.url;
   }

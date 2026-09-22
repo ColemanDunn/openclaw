@@ -538,7 +538,11 @@ export async function executeGitHubPublication<Row extends PublicationRow>(param
       assertAuthority();
       params.recordEffect?.("push");
       effectDispatched = true;
-      const pushed = await runCommand(pushArgs, { cwd: worktree.path, env: transportEnv });
+      const pushed = await runCommand(pushArgs, {
+        cwd: worktree.path,
+        env: transportEnv,
+        beforeRun: assertAuthority,
+      });
       params.recordEffect?.("push", pushed.code === 0 ? { headCommit } : {});
       assertAuthority();
       identity = await refreshIdentity();
@@ -586,6 +590,7 @@ export async function executeGitHubPublication<Row extends PublicationRow>(param
       effectDispatched = true;
       const created = await runCommand(githubPublicationCreatePullRequestArgs(repository), {
         env: identity.env,
+        beforeRun: assertAuthority,
         input: JSON.stringify({
           title: row.title?.trim() || `Publish ${branch}`,
           body,

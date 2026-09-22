@@ -128,7 +128,7 @@ export function createGitHubPublicationCoordinatorMethods(params: {
   ) => boolean;
   processRow: (
     initial: PublicationRow,
-    validateCustody: () => boolean,
+    validateExecution: () => boolean,
     assertInvocationCurrent?: () => void,
   ) => Promise<SessionGitHubPublicationResult>;
 }) {

@@ -22,6 +22,7 @@ import {
   insertGitHubPublicationRequest,
   claimGitHubPublicationExecution,
   createGitHubPublicationExecutionStore,
+  isGitHubPublicationExecutionOwner,
   projectGitHubPublicationResult,
 } from "./github-publication-store.js";
 import { REMOTE_GITHUB_PUBLICATION_SNAPSHOT_JS } from "./github-repository-publication-snapshot.js";
@@ -410,7 +411,7 @@ it.each([
         ...execution,
         identity: { prepare: async () => identity, isCurrent: () => true },
         validateAuthority: () => true,
-        validateCustody: () => true,
+        validateCustody: () => isGitHubPublicationExecutionOwner(requestId, "local-instance"),
         projectResult: projectGitHubPublicationResult,
       });
       const localHead = git(worktree.path, "rev-parse", "HEAD");

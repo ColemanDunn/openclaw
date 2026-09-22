@@ -30,8 +30,7 @@ export function createGitHubPublicationExecutionEffects<Row>(params: {
             error_code: null,
             next_action: null,
           },
-          // An accepted PR settles this execution even if its requester closed
-          // while GitHub was responding. The write owner still fences custody.
+          // This execution owns the accepted result even when its initiating action has ended.
           false,
         );
       }
