@@ -25,9 +25,10 @@ export function supportsXaiPriorityProcessing(model: {
   api?: string;
   baseUrl?: string;
 }): boolean {
-  return (
-    isXaiProviderId(model.provider) &&
-    (model.api === "openai-completions" || model.api === "openai-responses") &&
-    (isXaiBaseUrl(model.baseUrl, XAI_BASE_URL) || isXaiGrokProxyBaseUrl(model.baseUrl))
-  );
+  const isXaiProvider = isXaiProviderId(model.provider);
+  const isSupportedApi = model.api === "openai-completions" || model.api === "openai-responses";
+  const isSupportedEndpoint =
+    isXaiBaseUrl(model.baseUrl, XAI_BASE_URL) || isXaiGrokProxyBaseUrl(model.baseUrl);
+
+  return isXaiProvider && isSupportedApi && isSupportedEndpoint;
 }
