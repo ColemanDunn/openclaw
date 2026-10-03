@@ -29,8 +29,12 @@ const XAI_GROK_OAUTH_MODELS_CACHE_TTL_MS = 60_000;
 // Keep it classified here or the stream wrapper will omit encrypted reasoning from replay.
 const XAI_GROK_OAUTH_REASONING_MODEL_IDS = new Set(["grok-composer-2.5-fast"]);
 
+export function isXaiBaseUrl(baseUrl: string | undefined, expectedBaseUrl: string): boolean {
+  return URL.parse(baseUrl ?? "")?.href.replace(/\/+$/u, "") === expectedBaseUrl;
+}
+
 export function isXaiGrokProxyBaseUrl(baseUrl: string | undefined): boolean {
-  return URL.parse(baseUrl ?? "")?.href.replace(/\/+$/u, "") === XAI_GROK_OAUTH_BASE_URL;
+  return isXaiBaseUrl(baseUrl, XAI_GROK_OAUTH_BASE_URL);
 }
 
 export function buildXaiProvider(

@@ -224,6 +224,13 @@ transcription, xAI's Grok Voice Agent WebSocket for Talk realtime sessions,
 and the Responses API for chat, search, and code-execution tools.
 </Note>
 
+### Fast mode
+
+`/fast on` requests `service_tier: "priority"` on public xAI and Grok OAuth text
+endpoints; `/fast off` stops requesting it. The model, reasoning level, and explicit
+tiers are preserved. xAI controls eligibility and pricing. Legacy aliases retain
+the rewrites below.
+
 ### Legacy fast-mode compatibility
 
 `/fast on` or `agents.defaults.models["xai/<model>"].params.fastMode: true`
